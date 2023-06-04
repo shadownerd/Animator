@@ -1,35 +1,90 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor.Animations;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
-namespace Sahan.Animator
+namespace Sahan.AnimatorRecorder
 {
     public class AnimationRecorder : MonoBehaviour
     {
-        [SerializeField] private InputActionReference startAction;
-        [SerializeField] private InputActionReference endAction;
+        #region Singleton
+
+        public static AnimationRecorder Instance { get; private set; }
+        
+        private void Awake() 
+        {
+            if (Instance != null && Instance != this) 
+            { 
+                Destroy(this); 
+            } 
+            else 
+            { 
+                Instance = this; 
+            } 
+        }
+
+        #endregion
+        
+        [SerializeField] private GameObject gameObjectToRecord;
+        [SerializeField] private AnimationClip animationClip;
+        [SerializeField] private Animator previewAnimator;
+        
+        private GameObjectRecorder m_Recorder;
+        private bool isRecording = false;
+        
         private void Start()
         {
-            startAction.action.performed += OnRecordStarted;
-            endAction.action.performed += OnRecordEnd;
+            m_Recorder = new GameObjectRecorder(gameObjectToRecord);
+            m_Recorder.BindComponentsOfType<Transform>(gameObjectToRecord, true);
         }
 
-        private void OnDestroy()
+        public void StartRecording()
         {
-            startAction.action.performed -= OnRecordStarted;
-            endAction.action.performed -= OnRecordEnd;
+            isRecording = true;
         }
 
-        private void OnRecordStarted(InputAction.CallbackContext callbackContext)
+        public void SaveRecording()
         {
-            Debug.Log("Start");
+            if (animationClip == null)
+            {
+                return;
+            }
+
+            if (m_Recorder.isRecording)
+            {
+                m_Recorder.SaveToClip(animationClip);
+            }
+
+            isRecording = false;
+            
+            previewAnimator.Rebind();
+            previewAnimator.Update(0f);
         }
-        
-        private void OnRecordEnd(InputAction.CallbackContext callbackContext)
+
+        private void LateUpdate()
         {
-            Debug.Log("Stop");
+            if (isRecording)
+            {
+                if (animationClip == null)
+                {
+                    return;
+                }
+                m_Recorder.TakeSnapshot(Time.deltaTime);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (animationClip == null)
+            {
+                return;
+            }
+
+            if (m_Recorder.isRecording)
+            {
+                m_Recorder.SaveToClip(animationClip);
+            }
         }
     }
 }
